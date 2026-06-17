@@ -5,11 +5,17 @@
 #   GET  /api/estado       → Comprueba que la API y los modelos están listos
 #   GET  /api/umbrales     → Devuelve los umbrales de alerta configurados
 
+import threading
+import requests as http_client
+
 from flask import Flask, request, jsonify
 from modelo_anomalias import DetectorAnomalias, COLS_SENALES
 from config import UMBRALES_ALERTA, SENALES
 
 app = Flask(__name__)
+
+# URL del webhook de n8n (cambiar si n8n corre en otro host/puerto)
+N8N_WEBHOOK_URL = "http://localhost:5678/webhook/alerta"
 
 # Cargar modelos al arrancar la API
 detector = DetectorAnomalias()
@@ -79,7 +85,22 @@ def recibir_medida():
         "accion_recomendada": acciones.get(resultado["nivel_alerta"], ""),
     }
 
+    # Enviar alerta a n8n si es anomalia (en segundo plano para no bloquear)
+    if resultado["es_anomalia"]:
+        threading.Thread(
+            target=_notificar_n8n, args=(respuesta,), daemon=True
+        ).start()
+
     return jsonify(respuesta)
+
+
+def _notificar_n8n(payload: dict):
+    """Envía la alerta al webhook de n8n. No lanza excepción si falla."""
+    try:
+        resp = http_client.post(N8N_WEBHOOK_URL, json=payload, timeout=5)
+        print(f"  [n8n] Alerta enviada -> {resp.status_code}")
+    except http_client.RequestException as e:
+        print(f"  [n8n] No se pudo conectar: {e}")
 
 
 # ── GET /api/estado ──────────────────────────────────────────────────────
@@ -89,7 +110,8 @@ def estado():
     """Comprueba que la API está activa y los modelos cargados."""
     return jsonify({
         "estado": "activo",
-        "modelos_cargados": list(detector.modelos.keys()),
+        "modelo_global": detector.modelo_global is not None,
+        "modelos_individuales": list(detector.modelos.keys()),
         "senales_monitorizadas": list(SENALES.keys()),
     })
 
