@@ -1,46 +1,112 @@
-# Sistema de Detección de Anomalías en Señales Biométricas
+# Sistema de Deteccion de Anomalias en Senales Biometricas
 
-Proyecto de Trabajo de Fin de Grado (TFG) que implementa un sistema de detección de anomalías en señales biométricas de dispositivos wearable, utilizando Isolation Forest con línea base individual por usuario.
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.6-orange?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.1-lightgrey?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+Trabajo de Fin de Grado (TFG) que implementa un sistema de deteccion de anomalias en senales biometricas de dispositivos wearable, utilizando **Isolation Forest** con linea base individual por usuario y un modelo global de respaldo.
+
+---
+
+## Arquitectura
+
+```
++-------------+         +-----------------+         +-----------+
+|  Wearable / |  POST   |                 |  POST   |           |
+|  Simulador  +-------->+   API Flask     +-------->+   n8n     |
+|             |         |   :5000         |         |   :5678   |
++-------------+         +-------+---------+         +-----+-----+
+                                |                         |
+                         +------v--------+          +-----v-----+
+                         |               |          |  Email    |
+                         |  Isolation    |          |  Telegram |
+                         |  Forest       |          |  SMS      |
+                         |               |          +-----------+
+                         |  - Global     |
+                         |  - Individual |
+                         +------+--------+
+                                |
+                         +------v--------+
+                         |  Clasificar   |
+                         |  nivel alerta |
+                         |               |
+                         |  Normal       |
+                         |  Leve         |
+                         |  Moderada     |
+                         |  Grave        |
+                         +---------------+
+```
 
 ## Dataset
 
-Este proyecto utiliza el dataset público **[Sleep Health and Lifestyle Dataset](https://www.kaggle.com/datasets/uom190346a/sleep-health-and-lifestyle-dataset)** de Kaggle (400 registros, 13 variables, datos reales de salud y estilo de vida).
+Este proyecto soporta dos fuentes de datos:
 
-También incluye un generador de datos simulados para ampliar el volumen y demostrar el flujo completo.
+| Fuente | Registros | Descripcion |
+|--------|-----------|-------------|
+| [Sleep Health and Lifestyle Dataset](https://www.kaggle.com/datasets/uom190346a/sleep-health-and-lifestyle-dataset) (Kaggle) | 400 | Datos reales de salud y estilo de vida |
+| Generador simulado (`generador_datos.py`) | 1,000 | 20 usuarios con anomalias controladas al 5% |
 
-## Señales monitorizadas
+## Senales monitorizadas
 
-| Señal | Rango normal | Unidad |
+| Senal | Rango normal | Unidad |
 |-------|-------------|--------|
-| Frecuencia cardíaca | 50 – 100 | bpm |
-| Pasos diarios | 2,000 – 12,000 | pasos |
-| Horas de sueño | 4 – 10 | horas |
-| Calidad de sueño | 4 – 10 | 1-10 |
-| Nivel de estrés | 1 – 10 | 1-10 |
-| Actividad física | 20 – 90 | min/día |
-| Presión sistólica | 90 – 140 | mmHg |
-| Presión diastólica | 60 – 90 | mmHg |
+| Frecuencia cardiaca | 50 - 100 | bpm |
+| Pasos diarios | 2,000 - 12,000 | pasos |
+| Horas de sueno | 4 - 10 | horas |
+| Calidad de sueno | 4 - 10 | 1-10 |
+| Nivel de estres | 1 - 10 | 1-10 |
+| Actividad fisica | 20 - 90 | min/dia |
+| Presion sistolica | 90 - 140 | mmHg |
+| Presion diastolica | 60 - 90 | mmHg |
+
+## Resultados del modelo
+
+Metricas obtenidas tras calibrado empirico de umbrales (basados en percentiles p5/p2/p1 de los scores normales):
+
+| Metrica | Modelo global | Modelos individuales |
+|---------|--------------|---------------------|
+| **ROC-AUC** | 0.95 | 0.91 |
+| Precision (normal) | 98% | 98% |
+| Recall (anomalias) | 72% | 74% |
+| Tasa falsos positivos | 5.5% | 11.9% |
+
+### Distribucion por nivel de alerta
+
+| Nivel | Total | Anomalias reales | Normales |
+|-------|-------|-------------------|----------|
+| Normal | 847 | 14 | 833 |
+| Leve | 64 | 7 | 57 |
+| Moderada | 44 | 13 | 31 |
+| **Grave** | **45** | **20** | 25 |
+
+Los umbrales se calibran automaticamente a partir de la distribucion real de scores, no con valores arbitrarios.
 
 ## Niveles de alerta
 
-- **Leve** — Registro para vigilancia posterior
-- **Moderada** — Notificación al profesional sanitario
-- **Grave** — Alerta urgente multicanal (email + Telegram + SMS)
+| Nivel | Umbral (score) | Accion |
+|-------|---------------|--------|
+| Normal | > -0.52 | Sin accion necesaria |
+| Leve | -0.52 a -0.54 | Registrar y vigilar |
+| Moderada | -0.54 a -0.56 | Notificar al profesional sanitario |
+| Grave | < -0.56 | Alerta urgente multicanal |
 
 ## Estructura del proyecto
 
 ```
-├── config.py              # Configuración (rangos, umbrales, parámetros del modelo)
+tfg-anomalias/
+├── config.py              # Configuracion (rangos, umbrales calibrados, parametros)
 ├── cargar_kaggle.py       # Carga y preprocesa el dataset real de Kaggle
 ├── generador_datos.py     # Generador de datos simulados (alternativa)
-├── modelo_anomalias.py    # Modelo Isolation Forest (entrenamiento y predicción)
-├── visualizar.py          # Gráficas con matplotlib
-├── api.py                 # API REST en Flask
-├── flujo_n8n.md           # Documentación del flujo de notificaciones en n8n
-└── requirements.txt       # Dependencias
+├── modelo_anomalias.py    # Isolation Forest: modelo global + individuales
+├── visualizar.py          # Graficas con matplotlib
+├── api.py                 # API REST en Flask + webhook n8n
+├── flujo_n8n.md           # Documentacion del flujo de notificaciones
+├── requirements.txt       # Dependencias
+└── LICENSE
 ```
 
-## Instalación
+## Instalacion
 
 ```bash
 git clone https://github.com/kikeiro71/tfg-anomalias.git
@@ -51,32 +117,19 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
-## Uso con datos reales (Kaggle)
-
-1. Descarga el dataset desde [Kaggle](https://www.kaggle.com/datasets/uom190346a/sleep-health-and-lifestyle-dataset)
-2. Coloca el archivo `Sleep_health_and_lifestyle_dataset.csv` en la carpeta `datos/`
-3. Ejecuta:
+## Uso rapido
 
 ```bash
-# Cargar y preprocesar datos reales
-python cargar_kaggle.py
-
-# Entrenar modelos
-python modelo_anomalias.py
-
-# Generar gráficas
-python visualizar.py
-
-# Arrancar la API
-python api.py
-```
-
-## Uso con datos simulados (sin Kaggle)
-
-```bash
+# 1. Generar datos simulados (o usar cargar_kaggle.py con datos reales)
 python generador_datos.py
+
+# 2. Entrenar modelos y ver evaluacion
 python modelo_anomalias.py
+
+# 3. Generar graficas para la memoria
 python visualizar.py
+
+# 4. Arrancar la API
 python api.py
 ```
 
@@ -84,61 +137,70 @@ python api.py
 
 ### `POST /api/medida`
 
-Envía una medida biométrica y recibe la clasificación.
+Envia una medida biometrica y recibe la clasificacion.
 
-```bash
-curl -X POST http://localhost:5000/api/medida \
-  -H "Content-Type: application/json" \
-  -d '{
-    "usuario": "user_1",
-    "frecuencia_cardiaca": 140,
-    "pasos_diarios": 200,
-    "horas_sueno": 2,
-    "calidad_sueno": 1,
-    "nivel_estres": 10,
-    "actividad_fisica": 5,
-    "presion_sistolica": 180,
-    "presion_diastolica": 110
-  }'
+**Request:**
+
+```json
+{
+  "usuario": "user_1",
+  "frecuencia_cardiaca": 145,
+  "pasos_diarios": 300,
+  "horas_sueno": 3,
+  "calidad_sueno": 2,
+  "nivel_estres": 9,
+  "actividad_fisica": 5,
+  "presion_sistolica": 185,
+  "presion_diastolica": 115
+}
 ```
 
-Respuesta:
+**Response:**
 
 ```json
 {
   "usuario": "user_1",
   "es_anomalia": true,
-  "score": -0.6821,
-  "nivel_alerta": "moderada",
+  "score": -0.6764,
+  "nivel_alerta": "grave",
+  "modelo_usado": "individual",
   "senales_fuera_de_rango": [
-    {"senal": "frecuencia_cardiaca", "valor": 140, "tipo": "por_encima"},
-    {"senal": "presion_sistolica", "valor": 180, "tipo": "por_encima"}
+    {"senal": "frecuencia_cardiaca", "valor": 145.0, "tipo": "por_encima"},
+    {"senal": "presion_sistolica", "valor": 185.0, "tipo": "por_encima"}
   ],
-  "accion_recomendada": "Notificar al profesional sanitario"
+  "accion_recomendada": "Alerta urgente - contactar servicios de emergencia"
 }
 ```
 
 ### `GET /api/estado`
 
-Comprueba que la API y los modelos están activos.
+Comprueba que la API y los modelos estan activos.
 
 ### `GET /api/umbrales`
 
 Devuelve los umbrales de alerta configurados.
 
-## Tecnologías
-
-- **Python 3.10+**
-- **scikit-learn** — Isolation Forest para detección de anomalías
-- **pandas** — Manipulación de datos
-- **matplotlib** — Visualización
-- **Flask** — API REST
-- **n8n** — Automatización de notificaciones
-
 ## Flujo de notificaciones
 
-El flujo de notificaciones en n8n está documentado en [`flujo_n8n.md`](flujo_n8n.md), incluyendo arquitectura, nodos, configuración y diagramas.
+El sistema se integra con [n8n](https://n8n.io/) para automatizar notificaciones segun el nivel de alerta. La documentacion completa esta en [`flujo_n8n.md`](flujo_n8n.md).
+
+```
+Alerta leve      -->  Registro en base de datos
+Alerta moderada  -->  Email al profesional sanitario
+Alerta grave     -->  Email + Telegram + SMS
+```
+
+## Tecnologias
+
+| Tecnologia | Uso |
+|-----------|-----|
+| Python 3.12 | Lenguaje principal |
+| scikit-learn | Isolation Forest |
+| pandas | Manipulacion de datos |
+| matplotlib | Visualizacion |
+| Flask | API REST |
+| n8n | Automatizacion de notificaciones |
 
 ## Licencia
 
-Este proyecto forma parte de un Trabajo de Fin de Grado.
+[MIT](LICENSE)

@@ -1,13 +1,15 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
+*.egg
 dist/
 build/
-*.egg
 .venv/
 venv/
 env/
+.python-version
 
 # Datos generados y modelos (se regeneran con los scripts)
 datos/
@@ -17,7 +19,16 @@ datos/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Variables de entorno
+.env
+.env.local
