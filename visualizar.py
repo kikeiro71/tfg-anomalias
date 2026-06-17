@@ -104,15 +104,15 @@ def grafica_comparativa_real_vs_anomalo(df: pd.DataFrame):
         datos_normal = df[df["es_anomalia"] == 0][senal]
         datos_anomalo = df[df["es_anomalia"] == 1][senal]
 
-        ax.boxplot(
+        bp = ax.boxplot(
             [datos_normal, datos_anomalo],
-            labels=["Normal", "Anomalía"],
+            tick_labels=["Normal", "Anomalia"],
             patch_artist=True,
-            boxprops=[
-                dict(facecolor="#3498db", alpha=0.5),
-                dict(facecolor="#e74c3c", alpha=0.5),
-            ][0:1] * 2,  # Simplificado
         )
+        colores = ["#3498db", "#e74c3c"]
+        for patch, color in zip(bp["boxes"], colores):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.5)
         ax.set_title(senal.replace("_", " ").title(), fontsize=9)
         ax.set_ylabel(SENALES[senal]["unidad"], fontsize=8)
         ax.grid(True, alpha=0.3)
