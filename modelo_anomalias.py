@@ -106,7 +106,7 @@ class DetectorAnomalias:
         detalles = self._analizar_senales(medida)
 
         return {
-            "es_anomalia": prediccion == -1 or nivel != "normal",
+            "es_anomalia": bool(prediccion == -1 or nivel != "normal"),
             "score": round(float(score), 4),
             "nivel_alerta": nivel,
             "senales_fuera_de_rango": detalles,
@@ -193,13 +193,13 @@ if __name__ == "__main__":
     resultados = detector.entrenar(df)
 
     for usuario, info in resultados.items():
-        print(f"  {usuario}: {info['muestras_entrenamiento']} muestras → {info['estado']}")
+        print(f"  {usuario}: {info['muestras_entrenamiento']} muestras -> {info['estado']}")
 
     # Guardar modelos
     detector.guardar()
 
     # Prueba rápida con una medida anómala
-    print("\n── Prueba de predicción ──")
+    print("\n-- Prueba de prediccion --")
     medida_anomala = {
         "frecuencia_cardiaca": 140,   # Taquicardia
         "pasos_diarios": 200,         # Muy pocos pasos
