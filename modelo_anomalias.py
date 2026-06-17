@@ -2,6 +2,7 @@
 # ---------------------------------------------------------------------------
 # Entrena un modelo por usuario (línea base individual) y permite predecir
 # si una nueva medida es anómala y con qué nivel de gravedad.
+# Compatible con datos reales de Kaggle y datos simulados.
 
 import pickle
 from pathlib import Path
@@ -51,7 +52,9 @@ class DetectorAnomalias:
                 (df["usuario"] == usuario) & (df["es_anomalia"] == 0)
             ][COLS_SENALES]
 
-            if datos_usuario.empty:
+            if len(datos_usuario) < 5:
+                # Necesitamos un mínimo de muestras para entrenar
+                print(f"  {usuario}: solo {len(datos_usuario)} muestras, omitido")
                 continue
 
             # Escalar los datos (el Isolation Forest funciona mejor con datos normalizados)
@@ -167,9 +170,22 @@ class DetectorAnomalias:
 # ── Punto de entrada: entrenar y guardar ─────────────────────────────────
 
 if __name__ == "__main__":
-    # Cargar datos simulados
-    ruta_csv = "datos/biometricos_simulados.csv"
-    print(f"Cargando datos desde '{ruta_csv}'...")
+    # Intentar cargar datos reales; si no existen, usar simulados
+    ruta_real = "datos/dataset_procesado.csv"
+    ruta_simulado = "datos/biometricos_simulados.csv"
+
+    from pathlib import Path as P
+    if P(ruta_real).exists():
+        ruta_csv = ruta_real
+        print(f"Usando dataset real (Kaggle): '{ruta_csv}'")
+    elif P(ruta_simulado).exists():
+        ruta_csv = ruta_simulado
+        print(f"Usando dataset simulado: '{ruta_csv}'")
+    else:
+        print("ERROR: No se encontró ningún dataset.")
+        print("Ejecuta primero 'python cargar_kaggle.py' o 'python generador_datos.py'")
+        exit(1)
+
     df = pd.read_csv(ruta_csv)
 
     # Entrenar
@@ -185,12 +201,18 @@ if __name__ == "__main__":
     # Prueba rápida con una medida anómala
     print("\n── Prueba de predicción ──")
     medida_anomala = {
-        "frecuencia_cardiaca": 160,   # Taquicardia
-        "saturacion_oxigeno": 85,     # Desaturación
-        "temperatura": 39.5,          # Fiebre
-        "pasos_hora": 0,
+        "frecuencia_cardiaca": 140,   # Taquicardia
+        "pasos_diarios": 200,         # Muy pocos pasos
         "horas_sueno": 2,             # Poco sueño
+        "calidad_sueno": 1,           # Muy mala calidad
+        "nivel_estres": 10,           # Estrés máximo
+        "actividad_fisica": 5,        # Muy poca actividad
+        "presion_sistolica": 180,     # Hipertensión
+        "presion_diastolica": 110,    # Hipertensión
     }
-    resultado = detector.predecir("user_1", medida_anomala)
+    # Usar el primer usuario disponible
+    primer_usuario = list(detector.modelos.keys())[0]
+    resultado = detector.predecir(primer_usuario, medida_anomala)
+    print(f"  Usuario: {primer_usuario}")
     print(f"  Medida: {medida_anomala}")
     print(f"  Resultado: {resultado}")

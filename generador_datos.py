@@ -1,21 +1,18 @@
 # generador_datos.py — Genera datos biométricos simulados con anomalías controladas
 # ---------------------------------------------------------------------------------
-# Este script crea un CSV con medidas de varios usuarios ficticios.
-# Cada usuario tiene una "línea base" ligeramente distinta (variabilidad
-# inter-individual), y se inyectan anomalías en un porcentaje configurable
-# de las filas para poder evaluar el modelo.
+# Este script crea un CSV con medidas simuladas compatibles con las señales
+# del dataset de Kaggle. Sirve como alternativa cuando no se dispone del
+# dataset real, y para ampliar los datos con más usuarios y registros.
 
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 
 from config import SENALES
 
 # ── Parámetros de generación ─────────────────────────────────────────────
 
-NUM_USUARIOS = 5           # Usuarios simulados (user_1 … user_5)
-DIAS = 30                  # Días de datos por usuario
-MUESTRAS_POR_DIA = 24      # Una muestra por hora
+NUM_USUARIOS = 20          # Usuarios simulados
+REGISTROS_POR_USUARIO = 50 # Registros diarios por usuario
 PORCENTAJE_ANOMALIAS = 5   # % de filas que serán anómalas
 
 np.random.seed(42)
@@ -26,45 +23,37 @@ def _linea_base_usuario(user_id: int) -> dict:
     Genera parámetros de línea base individuales para un usuario.
     Cada persona tiene valores centrales ligeramente diferentes.
     """
-    desplazamiento = (user_id - 1) * 0.5  # pequeña variación entre usuarios
+    d = (user_id - 1) * 0.3  # pequeña variación entre usuarios
     return {
-        "frecuencia_cardiaca": 72 + desplazamiento,
-        "saturacion_oxigeno":  97 - desplazamiento * 0.2,
-        "temperatura":         36.5 + desplazamiento * 0.1,
-        "pasos_hora":          200 + desplazamiento * 20,
-        "horas_sueno":         7.0 - desplazamiento * 0.1,
+        "frecuencia_cardiaca": 72 + d,
+        "pasos_diarios":       6000 + d * 200,
+        "horas_sueno":         7.0 - d * 0.05,
+        "calidad_sueno":       7 - d * 0.1,
+        "nivel_estres":        4 + d * 0.1,
+        "actividad_fisica":    45 + d * 2,
+        "presion_sistolica":   120 + d,
+        "presion_diastolica":  78 + d * 0.5,
     }
 
 
 def _generar_muestra_normal(base: dict) -> dict:
     """Genera una muestra normal con ruido gaussiano alrededor de la línea base."""
     return {
-        "frecuencia_cardiaca": np.clip(
-            np.random.normal(base["frecuencia_cardiaca"], 8), 40, 180
-        ),
-        "saturacion_oxigeno": np.clip(
-            np.random.normal(base["saturacion_oxigeno"], 1.5), 70, 100
-        ),
-        "temperatura": np.clip(
-            np.random.normal(base["temperatura"], 0.3), 34.0, 41.0
-        ),
-        "pasos_hora": np.clip(
-            np.random.normal(base["pasos_hora"], 100), 0, 2000
-        ),
-        "horas_sueno": np.clip(
-            np.random.normal(base["horas_sueno"], 1.0), 0, 14
-        ),
+        "frecuencia_cardiaca": np.clip(np.random.normal(base["frecuencia_cardiaca"], 6), 40, 130),
+        "pasos_diarios":       np.clip(np.random.normal(base["pasos_diarios"], 1500), 0, 20000),
+        "horas_sueno":         np.clip(np.random.normal(base["horas_sueno"], 0.8), 2, 12),
+        "calidad_sueno":       np.clip(np.random.normal(base["calidad_sueno"], 1.0), 1, 10),
+        "nivel_estres":        np.clip(np.random.normal(base["nivel_estres"], 1.5), 1, 10),
+        "actividad_fisica":    np.clip(np.random.normal(base["actividad_fisica"], 12), 0, 120),
+        "presion_sistolica":   np.clip(np.random.normal(base["presion_sistolica"], 8), 80, 200),
+        "presion_diastolica":  np.clip(np.random.normal(base["presion_diastolica"], 5), 50, 120),
     }
 
 
 def _generar_muestra_anomala(base: dict) -> dict:
-    """
-    Genera una muestra anómala desplazando uno o más valores fuera del
-    rango normal.  Simula situaciones como fiebre, taquicardia, desaturación, etc.
-    """
+    """Genera una muestra anómala desplazando valores fuera del rango normal."""
     muestra = _generar_muestra_normal(base)
 
-    # Elegir aleatoriamente qué señales alterar (al menos una)
     senales_a_alterar = np.random.choice(
         list(SENALES.keys()),
         size=np.random.randint(1, 4),
@@ -73,15 +62,14 @@ def _generar_muestra_anomala(base: dict) -> dict:
 
     for senal in senales_a_alterar:
         rango = SENALES[senal]
-        # Desplazar el valor muy por encima o por debajo del rango normal
         if np.random.random() < 0.5:
             muestra[senal] = rango["max"] + np.random.uniform(
                 rango["max"] * 0.1, rango["max"] * 0.3
             )
         else:
-            muestra[senal] = rango["min"] - np.random.uniform(
+            muestra[senal] = max(0, rango["min"] - np.random.uniform(
                 rango["min"] * 0.05, rango["min"] * 0.15
-            )
+            ))
 
     return muestra
 
@@ -89,19 +77,13 @@ def _generar_muestra_anomala(base: dict) -> dict:
 def generar_dataset() -> pd.DataFrame:
     """
     Genera el dataset completo con datos normales y anomalías inyectadas.
-    Devuelve un DataFrame con columnas:
-        usuario, timestamp, frecuencia_cardiaca, saturacion_oxigeno,
-        temperatura, pasos_hora, horas_sueno, es_anomalia
     """
     registros = []
-    fecha_inicio = datetime(2026, 5, 1)
 
     for uid in range(1, NUM_USUARIOS + 1):
         base = _linea_base_usuario(uid)
-        total_muestras = DIAS * MUESTRAS_POR_DIA
 
-        for i in range(total_muestras):
-            timestamp = fecha_inicio + timedelta(hours=i)
+        for _ in range(REGISTROS_POR_USUARIO):
             es_anomalia = np.random.random() < (PORCENTAJE_ANOMALIAS / 100)
 
             if es_anomalia:
@@ -111,19 +93,21 @@ def generar_dataset() -> pd.DataFrame:
 
             registros.append({
                 "usuario": f"user_{uid}",
-                "timestamp": timestamp.isoformat(),
                 **muestra,
                 "es_anomalia": int(es_anomalia),
             })
 
     df = pd.DataFrame(registros)
 
-    # Redondear valores para mayor legibilidad
-    df["frecuencia_cardiaca"] = df["frecuencia_cardiaca"].round(1)
-    df["saturacion_oxigeno"] = df["saturacion_oxigeno"].round(1)
-    df["temperatura"] = df["temperatura"].round(2)
-    df["pasos_hora"] = df["pasos_hora"].round(0).astype(int)
+    # Redondear valores
+    df["frecuencia_cardiaca"] = df["frecuencia_cardiaca"].round(0).astype(int)
+    df["pasos_diarios"] = df["pasos_diarios"].round(0).astype(int)
     df["horas_sueno"] = df["horas_sueno"].round(1)
+    df["calidad_sueno"] = df["calidad_sueno"].round(0).astype(int)
+    df["nivel_estres"] = df["nivel_estres"].round(0).astype(int)
+    df["actividad_fisica"] = df["actividad_fisica"].round(0).astype(int)
+    df["presion_sistolica"] = df["presion_sistolica"].round(0).astype(int)
+    df["presion_diastolica"] = df["presion_diastolica"].round(0).astype(int)
 
     return df
 

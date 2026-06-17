@@ -2,15 +2,24 @@
 
 Proyecto de Trabajo de Fin de Grado (TFG) que implementa un sistema de detección de anomalías en señales biométricas de dispositivos wearable, utilizando Isolation Forest con línea base individual por usuario.
 
+## Dataset
+
+Este proyecto utiliza el dataset público **[Sleep Health and Lifestyle Dataset](https://www.kaggle.com/datasets/uom190346a/sleep-health-and-lifestyle-dataset)** de Kaggle (400 registros, 13 variables, datos reales de salud y estilo de vida).
+
+También incluye un generador de datos simulados para ampliar el volumen y demostrar el flujo completo.
+
 ## Señales monitorizadas
 
 | Señal | Rango normal | Unidad |
 |-------|-------------|--------|
-| Frecuencia cardíaca | 50 – 120 | bpm |
-| Saturación de oxígeno | 90 – 100 | % |
-| Temperatura corporal | 35.5 – 37.5 | °C |
-| Pasos por hora | 0 – 800 | pasos/h |
+| Frecuencia cardíaca | 50 – 100 | bpm |
+| Pasos diarios | 2,000 – 12,000 | pasos |
 | Horas de sueño | 4 – 10 | horas |
+| Calidad de sueño | 4 – 10 | 1-10 |
+| Nivel de estrés | 1 – 10 | 1-10 |
+| Actividad física | 20 – 90 | min/día |
+| Presión sistólica | 90 – 140 | mmHg |
+| Presión diastólica | 60 – 90 | mmHg |
 
 ## Niveles de alerta
 
@@ -22,7 +31,8 @@ Proyecto de Trabajo de Fin de Grado (TFG) que implementa un sistema de detecció
 
 ```
 ├── config.py              # Configuración (rangos, umbrales, parámetros del modelo)
-├── generador_datos.py     # Generador de datos simulados con anomalías controladas
+├── cargar_kaggle.py       # Carga y preprocesa el dataset real de Kaggle
+├── generador_datos.py     # Generador de datos simulados (alternativa)
 ├── modelo_anomalias.py    # Modelo Isolation Forest (entrenamiento y predicción)
 ├── visualizar.py          # Gráficas con matplotlib
 ├── api.py                 # API REST en Flask
@@ -33,7 +43,7 @@ Proyecto de Trabajo de Fin de Grado (TFG) que implementa un sistema de detecció
 ## Instalación
 
 ```bash
-git clone https://github.com/tu-usuario/tfg-anomalias.git
+git clone https://github.com/kikeiro71/tfg-anomalias.git
 cd tfg-anomalias
 python -m venv venv
 source venv/bin/activate        # Linux/Mac
@@ -41,19 +51,32 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
-## Uso
+## Uso con datos reales (Kaggle)
+
+1. Descarga el dataset desde [Kaggle](https://www.kaggle.com/datasets/uom190346a/sleep-health-and-lifestyle-dataset)
+2. Coloca el archivo `Sleep_health_and_lifestyle_dataset.csv` en la carpeta `datos/`
+3. Ejecuta:
 
 ```bash
-# 1. Generar datos simulados
-python generador_datos.py
+# Cargar y preprocesar datos reales
+python cargar_kaggle.py
 
-# 2. Entrenar modelos (uno por usuario)
+# Entrenar modelos
 python modelo_anomalias.py
 
-# 3. Generar gráficas
+# Generar gráficas
 python visualizar.py
 
-# 4. Arrancar la API
+# Arrancar la API
+python api.py
+```
+
+## Uso con datos simulados (sin Kaggle)
+
+```bash
+python generador_datos.py
+python modelo_anomalias.py
+python visualizar.py
 python api.py
 ```
 
@@ -68,11 +91,14 @@ curl -X POST http://localhost:5000/api/medida \
   -H "Content-Type: application/json" \
   -d '{
     "usuario": "user_1",
-    "frecuencia_cardiaca": 160,
-    "saturacion_oxigeno": 85,
-    "temperatura": 39.5,
-    "pasos_hora": 0,
-    "horas_sueno": 2
+    "frecuencia_cardiaca": 140,
+    "pasos_diarios": 200,
+    "horas_sueno": 2,
+    "calidad_sueno": 1,
+    "nivel_estres": 10,
+    "actividad_fisica": 5,
+    "presion_sistolica": 180,
+    "presion_diastolica": 110
   }'
 ```
 
@@ -85,8 +111,8 @@ Respuesta:
   "score": -0.6821,
   "nivel_alerta": "moderada",
   "senales_fuera_de_rango": [
-    {"senal": "frecuencia_cardiaca", "valor": 160, "tipo": "por_encima"},
-    {"senal": "saturacion_oxigeno", "valor": 85, "tipo": "por_debajo"}
+    {"senal": "frecuencia_cardiaca", "valor": 140, "tipo": "por_encima"},
+    {"senal": "presion_sistolica", "valor": 180, "tipo": "por_encima"}
   ],
   "accion_recomendada": "Notificar al profesional sanitario"
 }

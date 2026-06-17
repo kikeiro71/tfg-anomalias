@@ -27,20 +27,13 @@ def recibir_medida():
     {
         "usuario": "user_1",
         "frecuencia_cardiaca": 130,
-        "saturacion_oxigeno": 88,
-        "temperatura": 39.2,
-        "pasos_hora": 50,
-        "horas_sueno": 3
-    }
-
-    Respuesta:
-    {
-        "usuario": "user_1",
-        "es_anomalia": true,
-        "score": -0.4523,
-        "nivel_alerta": "moderada",
-        "senales_fuera_de_rango": [...],
-        "accion_recomendada": "Notificar al profesional sanitario"
+        "pasos_diarios": 200,
+        "horas_sueno": 3,
+        "calidad_sueno": 2,
+        "nivel_estres": 9,
+        "actividad_fisica": 5,
+        "presion_sistolica": 170,
+        "presion_diastolica": 105
     }
     """
     datos = request.get_json()
